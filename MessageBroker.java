@@ -14,6 +14,7 @@ public class MessageBroker implements IMessageBroker {
 	private Map<String, List<ConsumerCallback>> topics = new HashMap<>();
 	private Queue<Message>[] queues = null;
 	private int noOfQueues;
+	private static int queueToUse;
 	
 	public MessageBroker(int noOfQueues) {
 		this.noOfQueues = noOfQueues;
@@ -49,8 +50,8 @@ public class MessageBroker implements IMessageBroker {
 	@Override
 	public void send(Message message) {
 		// get one of the queues, put message on
-		int randomNum = ThreadLocalRandom.current().nextInt(0, noOfQueues);
-		Queue<Message> queue = queues[randomNum];
+		Queue<Message> queue = queues[queueToUse++];
+		queueToUse = queueToUse<noOfQueues?queueToUse:0;
 		queue.add(message);
 		
 	}
@@ -58,11 +59,11 @@ public class MessageBroker implements IMessageBroker {
 	private class QueueListener implements Runnable {
 		
 		private Queue<Message> queue;
-		private int runnablenstance;
+		private int runnablenInstance;
 		
-		public QueueListener(Queue<Message> queue, int runnablenstance) {
+		public QueueListener(Queue<Message> queue, int runnablenInstance) {
 			this.queue = queue;
-			this.runnablenstance = runnablenstance;
+			this.runnablenInstance = runnablenInstance;
 		}
 
 		@Override
@@ -78,7 +79,7 @@ public class MessageBroker implements IMessageBroker {
 				if (message!=null) {
 					String content = message.getContent();
 					for (ConsumerCallback callback : topics.get(message.getTopic())) {
-						callback.alertConsumer(content, runnablenstance);
+						callback.alertConsumer(content, runnablenInstance);
 					}					
 				}
 			}
