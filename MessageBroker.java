@@ -6,7 +6,9 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
+import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.ThreadPoolExecutor;
 
 public class MessageBroker implements IMessageBroker {
 	
@@ -15,22 +17,37 @@ public class MessageBroker implements IMessageBroker {
 	private Queue<Message>[] queues = null;
 	private int noOfQueues;
 	private static int queueToUse;
+	private ThreadPoolExecutor executor = 
+			  (ThreadPoolExecutor) Executors.newCachedThreadPool();
 	
+	@SuppressWarnings("unchecked")
 	public MessageBroker(int noOfQueues) {
 		this.noOfQueues = noOfQueues;
 		queues = new Queue[noOfQueues];
 		for (int i=0; i<noOfQueues; i++) {
 			Queue<Message> queue = new LinkedList<Message>(); 
 			queues[i] = queue;
-			QueueListener listener = new QueueListener(queue, i);
-			Thread t = new Thread(listener);
-			t.start();
-		}
-		
+			
+			// get a thread from the pool for each queue
+			executor.submit(() -> {
+				while (true) {
+					Message message = queue.poll();
+					try {
+						Thread.sleep(1000);
+					} catch (InterruptedException e) {
+						e.printStackTrace();
+					}
+					if (message!=null) {
+						String content = message.getContent();
+						for (ConsumerCallback callback : topics.get(message.getTopic())) {
+							callback.alertConsumer(content, Thread.currentThread().getName());
+						}					
+					}
+				}
+			});
+		}	
 		
 	}
-	
-	// create task executor with each thread listening to a separate queue
 	
 
 	@Override
@@ -43,8 +60,6 @@ public class MessageBroker implements IMessageBroker {
 		} else {
 			consumers.add(consumer);
 		}
-		
-
 	}
 
 	@Override
@@ -53,39 +68,7 @@ public class MessageBroker implements IMessageBroker {
 		Queue<Message> queue = queues[queueToUse++];
 		queueToUse = queueToUse<noOfQueues?queueToUse:0;
 		queue.add(message);
-		
 	}
 	
-	private class QueueListener implements Runnable {
-		
-		private Queue<Message> queue;
-		private int runnablenInstance;
-		
-		public QueueListener(Queue<Message> queue, int runnablenInstance) {
-			this.queue = queue;
-			this.runnablenInstance = runnablenInstance;
-		}
-
-		@Override
-		public void run() {
-			while (true) {
-				Message message = queue.poll();
-				try {
-					Thread.sleep(2000);
-				} catch (InterruptedException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				}
-				if (message!=null) {
-					String content = message.getContent();
-					for (ConsumerCallback callback : topics.get(message.getTopic())) {
-						callback.alertConsumer(content, runnablenInstance);
-					}					
-				}
-			}
-			
-		}
-		
-	}
 
 }
